@@ -1,0 +1,15 @@
+{
+  "name": "azure-joke-api-bicep",
+  "version": "1.0.0",
+  "description": "Small Node.js Joke API deployed to Azure App Service with modular Bicep.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "express": "^4.18.3"
+  }
+}
