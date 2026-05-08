@@ -63,10 +63,13 @@ webapp-name:
 
 deploy-app: package
 	WEB_APP_NAME="$${WEB_APP_NAME:-$$(az deployment group show --resource-group "$(RESOURCE_GROUP)" --name "$(DEPLOYMENT_NAME)" --query properties.outputs.webAppName.value --output tsv)}"; \
-	az webapp deployment source config-zip \
+	az webapp deploy \
 		--resource-group "$(RESOURCE_GROUP)" \
 		--name "$${WEB_APP_NAME}" \
-		--src "$(ZIP_FILE)"
+		--src-path "$(ZIP_FILE)" \
+		--type zip \
+		--async true \
+		--restart true
 
 smoke:
 	WEB_APP_NAME="$${WEB_APP_NAME:-$$(az deployment group show --resource-group "$(RESOURCE_GROUP)" --name "$(DEPLOYMENT_NAME)" --query properties.outputs.webAppName.value --output tsv)}"; \

@@ -39,8 +39,10 @@ var webAppName = '${namePrefix}-${uniqueSuffix}-web'
 var appServicePlanName = '${namePrefix}-asp'
 
 // Storage account names must be globally unique, lowercase, and 3-24 chars.
-// uniqueString(resourceGroup().id) makes the name stable for this resource group.
-var storageAccountName = toLower('${projectName}${environment}${uniqueString(resourceGroup().id)}')
+// They also cannot contain hyphens, so the project segment is normalized and
+// shortened before adding the stable resource-group-specific unique suffix.
+var storageProjectSegment = take(toLower(replace(projectName, '-', '')), 7)
+var storageAccountName = '${storageProjectSegment}${environment}${uniqueSuffix}'
 
 // Modules compile to ARM nested deployments. Each module owns a small part of
 // the infrastructure so learners can focus on one resource type at a time.
@@ -74,6 +76,10 @@ module webApp 'modules/web-app.bicep' = {
       APP_NAME: 'azure-joke-api-bicep'
       APP_ENV: environment
       STORAGE_ACCOUNT_NAME: storageAccount.outputs.name
+      SCM_DO_BUILD_DURING_DEPLOYMENT: 'true'
+      ENABLE_ORYX_BUILD: 'true'
+      WEBSITE_WARMUP_PATH: '/health'
+      WEBSITE_WARMUP_STATUSES: '200'
     }
     tags: tags
   }

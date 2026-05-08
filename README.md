@@ -122,7 +122,13 @@ This runs a Node.js syntax check, `az bicep lint`, and `az bicep build`.
 
 ## Deploy Infrastructure
 
-Choose names that are unique enough for your subscription:
+Log in to Azure first if needed:
+
+```bash
+az login
+```
+
+The Makefile has sensible defaults:
 
 ```bash
 RESOURCE_GROUP=rg-joke-api-bicep-dev
@@ -131,59 +137,47 @@ PROJECT_NAME=jokeapi
 ENVIRONMENT=dev
 ```
 
-Create the resource group:
+You can use the defaults directly:
 
 ```bash
 make group-create
-```
-
-Deploy the Bicep template:
-
-```bash
 make deploy-infra
 ```
 
-Get the deployed web app name:
+Or override values inline. Keep `PROJECT_NAME` short because it contributes to Azure resource names:
 
 ```bash
-WEB_APP_NAME=$(az deployment group show \
-  --resource-group "$RESOURCE_GROUP" \
-  --name joke-api-infra \
-  --query properties.outputs.webAppName.value \
-  --output tsv)
+make group-create RESOURCE_GROUP=rg-joke-api-bicep-test LOCATION=australiaeast
+make deploy-infra RESOURCE_GROUP=rg-joke-api-bicep-test PROJECT_NAME=jokeapi ENVIRONMENT=test LOCATION=australiaeast
 ```
 
-## Deploy The App Code
+`make deploy-infra` creates the App Service Plan, Linux Web App, and Storage Account.
 
-Create a zip package that excludes local dependencies and generated files:
+## Deploy The App
 
-```bash
-make package
-```
-
-Deploy the zip to App Service:
+After the infrastructure exists, deploy the Node.js app:
 
 ```bash
 make deploy-app
 ```
 
-Check the health endpoint:
+`make deploy-app` creates `app.zip`, reads the Web App name from the deployment outputs, and uploads the zip to App Service.
+The Web App enables App Service build automation for zip deployments, so Azure installs the Node.js dependencies from `package-lock.json` during deployment.
+The deployment target uploads asynchronously; use `make smoke` to confirm the restarted app is serving traffic.
+
+Run a smoke test against the deployed app:
 
 ```bash
-HOSTNAME=$(az webapp show \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$WEB_APP_NAME" \
-  --query defaultHostName \
-  --output tsv)
-
-curl "https://$HOSTNAME/health"
-curl "https://$HOSTNAME/joke"
-curl "https://$HOSTNAME/metadata"
+make smoke
 ```
 
-Or run the same checks through Make:
+The full deploy flow is:
 
 ```bash
+make lint
+make group-create
+make deploy-infra
+make deploy-app
 make smoke
 ```
 
@@ -200,6 +194,7 @@ The Makefile wraps the common local and Azure commands:
 | `make install` | Install dependencies with `npm ci` |
 | `make start` | Run the Express API locally |
 | `make lint` | Run Node check, Bicep lint, and Bicep build |
+| `make package` | Create `app.zip` for App Service zip deployment |
 | `make group-create` | Create the Azure resource group |
 | `make deploy-infra` | Deploy the Bicep infrastructure |
 | `make deploy-app` | Package and deploy the app zip |
@@ -210,38 +205,6 @@ Override defaults inline when needed:
 
 ```bash
 make deploy-infra RESOURCE_GROUP=rg-joke-api-bicep-test ENVIRONMENT=test LOCATION=australiaeast
-```
-
-## Raw Azure CLI Equivalents
-
-The Makefile wraps these commands. Keeping the raw commands visible is useful while learning what each target does.
-
-```bash
-az group create \
-  --name "$RESOURCE_GROUP" \
-  --location "$LOCATION"
-```
-
-```bash
-az deployment group create \
-  --name joke-api-infra \
-  --resource-group "$RESOURCE_GROUP" \
-  --template-file infra/main.bicep \
-  --parameters projectName="$PROJECT_NAME" environment="$ENVIRONMENT" location="$LOCATION"
-```
-
-```bash
-az webapp deployment source config-zip \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$WEB_APP_NAME" \
-  --src app.zip
-```
-
-```bash
-az group delete \
-  --name "$RESOURCE_GROUP" \
-  --yes \
-  --no-wait
 ```
 
 ## GitHub Actions
