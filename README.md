@@ -13,8 +13,8 @@ A small Node.js + Express Joke API deployed to Azure App Service with modular Bi
 Run locally:
 
 ```bash
-npm install
-npm start
+make install
+make start
 ```
 
 Then open:
@@ -107,10 +107,18 @@ Terraform usually keeps a separate state file because it manages resources acros
 From the project root:
 
 ```bash
-az bicep build --file infra/main.bicep
+make bicep-build
 ```
 
 This produces `infra/main.json`, an ARM template generated from the Bicep files.
+
+Run all local validation:
+
+```bash
+make lint
+```
+
+This runs a Node.js syntax check, `az bicep lint`, and `az bicep build`.
 
 ## Deploy Infrastructure
 
@@ -126,19 +134,13 @@ ENVIRONMENT=dev
 Create the resource group:
 
 ```bash
-az group create \
-  --name "$RESOURCE_GROUP" \
-  --location "$LOCATION"
+make group-create
 ```
 
 Deploy the Bicep template:
 
 ```bash
-az deployment group create \
-  --name joke-api-infra \
-  --resource-group "$RESOURCE_GROUP" \
-  --template-file infra/main.bicep \
-  --parameters projectName="$PROJECT_NAME" environment="$ENVIRONMENT" location="$LOCATION"
+make deploy-infra
 ```
 
 Get the deployed web app name:
@@ -156,16 +158,13 @@ WEB_APP_NAME=$(az deployment group show \
 Create a zip package that excludes local dependencies and generated files:
 
 ```bash
-zip -r app.zip package.json src -x "node_modules/*"
+make package
 ```
 
 Deploy the zip to App Service:
 
 ```bash
-az webapp deployment source config-zip \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$WEB_APP_NAME" \
-  --src app.zip
+make deploy-app
 ```
 
 Check the health endpoint:
@@ -181,6 +180,79 @@ curl "https://$HOSTNAME/health"
 curl "https://$HOSTNAME/joke"
 curl "https://$HOSTNAME/metadata"
 ```
+
+Or run the same checks through Make:
+
+```bash
+make smoke
+```
+
+## Make Targets
+
+```bash
+make help
+```
+
+The Makefile wraps the common local and Azure commands:
+
+| Target | Purpose |
+| --- | --- |
+| `make install` | Install dependencies with `npm ci` |
+| `make start` | Run the Express API locally |
+| `make lint` | Run Node check, Bicep lint, and Bicep build |
+| `make group-create` | Create the Azure resource group |
+| `make deploy-infra` | Deploy the Bicep infrastructure |
+| `make deploy-app` | Package and deploy the app zip |
+| `make smoke` | Call deployed `/health`, `/joke`, and `/metadata` |
+| `make destroy` | Delete the resource group |
+
+Override defaults inline when needed:
+
+```bash
+make deploy-infra RESOURCE_GROUP=rg-joke-api-bicep-test ENVIRONMENT=test LOCATION=australiaeast
+```
+
+## Raw Azure CLI Equivalents
+
+The Makefile wraps these commands. Keeping the raw commands visible is useful while learning what each target does.
+
+```bash
+az group create \
+  --name "$RESOURCE_GROUP" \
+  --location "$LOCATION"
+```
+
+```bash
+az deployment group create \
+  --name joke-api-infra \
+  --resource-group "$RESOURCE_GROUP" \
+  --template-file infra/main.bicep \
+  --parameters projectName="$PROJECT_NAME" environment="$ENVIRONMENT" location="$LOCATION"
+```
+
+```bash
+az webapp deployment source config-zip \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$WEB_APP_NAME" \
+  --src app.zip
+```
+
+```bash
+az group delete \
+  --name "$RESOURCE_GROUP" \
+  --yes \
+  --no-wait
+```
+
+## GitHub Actions
+
+The workflow in `.github/workflows/ci.yml` runs on pushes to `main` and pull requests. It installs Node.js dependencies, installs the Bicep CLI, and runs:
+
+```bash
+make lint
+```
+
+The workflow validates the project only. It does not log in to Azure and does not provision infrastructure.
 
 ## Modules And ARM Nested Deployments
 
@@ -205,8 +277,5 @@ Bicep feels closest to writing Azure-native infrastructure code. Terraform is br
 Delete the resource group and everything inside it:
 
 ```bash
-az group delete \
-  --name "$RESOURCE_GROUP" \
-  --yes \
-  --no-wait
+make destroy
 ```

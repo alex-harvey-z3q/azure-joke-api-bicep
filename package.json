@@ -4,6 +4,7 @@
   "description": "Small Node.js Joke API deployed to Azure App Service with modular Bicep.",
   "main": "src/server.js",
   "scripts": {
+    "check": "node --check src/server.js",
     "start": "node src/server.js"
   },
   "engines": {
